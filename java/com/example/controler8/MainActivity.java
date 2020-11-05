@@ -15,20 +15,23 @@ import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private SensorManager mSensorManager;
-    private Sensor mAccelerometer;
+
+    private final float[] accelerometerReading = new float[3];
+    private final float[] magnetometerReading = new float[3];
+    private final float[] rotationMatrix = new float[9];
+    private final float[] orientationAngles = new float[3];
 
     private TextView tvx;
     private TextView tvy;
     private TextView tvz;
 
     @Override
-    public final void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
         tvx = findViewById(R.id.acceleratorX);
         tvy = findViewById(R.id.acceleratorY);
@@ -36,26 +39,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     @Override
-    public final void onAccuracyChanged(Sensor sensor, int accuracy)
+    public void onAccuracyChanged(Sensor sensor, int accuracy)
     {
         // Do nothing!
-    }
-
-    @Override
-    public final void onSensorChanged(SensorEvent event)
-    {
-        float[] values = event.values;//获取传感器XYZ方向上的数值
-        tvx.setText("X: " + Float.toString(values[0]));
-        tvy.setText("Y: " + Float.toString(values[1]));
-        tvz.setText("Z: " + Float.toString(values[2]));
-
     }
 
     @Override
     protected void onResume()
     {
         super.onResume();
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+
+        Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if(mAccelerometer != null)
+        {
+            mSensorManager.registerListener(this, mAccelerometer,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
+
+        Sensor mMagneticField = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if(mMagneticField != null)
+        {
+            mSensorManager.registerListener(this, mMagneticField,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
     }
 
     @Override
@@ -63,5 +69,28 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     {
         super.onPause();
         mSensorManager.unregisterListener(this);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event)
+    {
+        if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER)
+        {
+            System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.length);
+        }
+        else if ( event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD)
+        {
+            System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.length);
+        }
+        mSensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading);
+        mSensorManager.getOrientation(rotationMatrix, orientationAngles);
+
+        float angleZ = (float) Math.toDegrees(orientationAngles[0]);
+        float angleX = (float) Math.toDegrees(orientationAngles[1]);
+        float anglyY = (float) Math.toDegrees(orientationAngles[2]);
+
+        tvx.setText("left-right: " + String.format("%.02f", angleX));
+        tvy.setText("bottom-up: " + String.format("%.02f", anglyY));
+        tvz.setText("not used: " + String.format("%.02f", angleZ));
     }
 }
